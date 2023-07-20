@@ -61,7 +61,7 @@ spec:
     metadata:
       name: "{{.metadata.name}}-haproxy-server"
       namespace: "{{.metadata.namespace}}"
-      annotations: "{{ .spec.commonAnnotations | default (coll.Dict) | data.ToJSON }}"
+      annotations: "{{ mergeOverwrite (dict \"reloader.stakater.com/auto\" \"true\") (.spec.commonAnnotations | default (coll.Dict)) | data.ToJSON }}"
     spec:
       replicas: 2
       selector:
