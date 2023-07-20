@@ -81,12 +81,12 @@ spec:
               - name: HTTP_UPSTREAM
                 valueFrom:
                   configMapKeyRef:
-                    name: haproxy
+                    name: "{{.metadata.name}}-haproxy-server"
                     key: HTTP_UPSTREAM
               - name: HTTPS_UPSTREAM
                 valueFrom:
                   configMapKeyRef:
-                    name: haproxy
+                    name: "{{.metadata.name}}-haproxy-server"
                     key: HTTPS_UPSTREAM
               volumeMounts:
                 - mountPath: /usr/local/etc/haproxy/haproxy.cfg
@@ -106,7 +106,7 @@ spec:
           volumes:
             - name: config
               configMap:
-                name: haproxy
+                name: "{{.metadata.name}}-haproxy-server"
   - apiVersion: v1
     kind: Service
     metadata:
