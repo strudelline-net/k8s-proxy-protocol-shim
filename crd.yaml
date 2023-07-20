@@ -1,0 +1,47 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: proxyprotocolshims.utilities.strudelline.net
+spec:
+  group: utilities.strudelline.net
+  names:
+    kind: ProxyProtocolShim
+    listKind: ProxyProtocolShimList
+    plural: proxyprotocolshims
+    singular: proxyprotocolshim
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: ProxyProtocolShim is the Schema for the proxyprotocolshims API
+        properties:
+          apiVersion: {"description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources","type":"string"}
+          kind: {"description":"Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds","type":"string"}
+          metadata: {"type":"object"}
+          spec:
+            description: ProxyProtocolShimSpec defines the desired state of ProxyProtocolShim
+            properties:
+              upstream:
+                type: object
+                properties:
+                  http:
+                    type: string
+                  https:
+                    type: string
+                required:
+                - http
+                - https
+              commonAnnotations:
+                type: object
+                additionalProperties: true
+            required:
+            - upstream
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

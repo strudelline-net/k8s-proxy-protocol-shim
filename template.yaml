@@ -1,0 +1,139 @@
+apiVersion: templating.flanksource.com/v1
+kind: Template
+metadata:
+  name: proxy-protocol-shim
+spec:
+  source:
+    apiVersion: utilities.strudelline.net/v1alpha1
+    kind: ProxyProtocolShim
+  resources:
+  - apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: "{{.metadata.name}}-haproxy-server"
+      namespace: "{{.metadata.namespace}}"
+      annotations: "{{ .spec.commonAnnotations | default (coll.Dict) | data.ToJSON }}"
+    data:
+      HTTPS_UPSTREAM: "{{ .spec.upstream.https }}"
+      HTTP_UPSTREAM: "{{ .spec.upstream.http }}"
+      haproxy.cfg: |
+        global
+        	log stdout format raw local0
+        	stats timeout 30s
+        	user haproxy
+        	group haproxy
+        
+        defaults
+        	log	global
+        	mode	tcp
+        	option	tcplog
+        	option	dontlognull
+            balance source
+            timeout connect 5000
+            timeout client  50000
+            timeout server  50000
+        
+        frontend http80
+            bind *:80
+            mode http
+            http-request redirect scheme https
+        
+        frontend https443
+            bind *:443
+            default_backend httpsnodes
+        
+        backend httpnodes
+            server s1 $HTTP_UPSTREAM check send-proxy
+        
+        backend httpsnodes
+            server s1 $HTTPS_UPSTREAM check send-proxy
+        
+        frontend stats
+            mode http
+            option httplog
+            bind *:8404
+            stats enable
+            stats uri /
+            stats refresh 10s
+            stats admin if LOCALHOST
+  - apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: "{{.metadata.name}}-haproxy-server"
+      namespace: "{{.metadata.namespace}}"
+      annotations: "{{ .spec.commonAnnotations | default (coll.Dict) | data.ToJSON }}"
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          app: "{{.metadata.name}}-haproxy-server"
+      strategy:
+        type: Recreate
+      template:
+        metadata:
+          labels:
+            app: "{{.metadata.name}}-haproxy-server"
+        spec:
+          containers:
+           -  image: haproxy:latest
+              name: haproxy
+              env:
+              - name: HTTP_UPSTREAM
+                valueFrom:
+                  configMapKeyRef:
+                    name: haproxy
+                    key: HTTP_UPSTREAM
+              - name: HTTPS_UPSTREAM
+                valueFrom:
+                  configMapKeyRef:
+                    name: haproxy
+                    key: HTTPS_UPSTREAM
+              volumeMounts:
+                - mountPath: /usr/local/etc/haproxy/haproxy.cfg
+                  name: config
+                  subPath: haproxy.cfg
+              ports:
+              - containerPort: 80
+                name: http
+                protocol: TCP
+              - containerPort: 443
+                name: https
+                protocol: TCP
+              - containerPort: 8404
+                name: stats
+                protocol: TCP
+          restartPolicy: Always
+          volumes:
+            - name: config
+              configMap:
+                name: haproxy
+  - apiVersion: v1
+    kind: Service
+    metadata:
+      name: "{{.metadata.name}}-haproxy-server"
+      namespace: "{{.metadata.namespace}}"
+      annotations: "{{ .spec.commonAnnotations | default (coll.Dict) | data.ToJSON }}"
+    spec:
+      allocateLoadBalancerNodePorts: true
+      externalTrafficPolicy: Local
+      internalTrafficPolicy: Local
+      ipFamilies:
+      - IPv4
+      ipFamilyPolicy: SingleStack
+      ports:
+      - name: http-80
+        port: 80
+        protocol: TCP
+        targetPort: http
+      - name: https-443
+        port: 443
+        protocol: TCP
+        targetPort: https
+      - name: https-8404
+        port: 8404
+        protocol: TCP
+        targetPort: stats
+      selector:
+        app: "{{.metadata.name}}-haproxy-server"
+      type: LoadBalancer
+

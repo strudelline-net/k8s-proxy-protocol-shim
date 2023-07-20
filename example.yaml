@@ -1,0 +1,41 @@
+# this example sets up PROXY protocol in istio and creates a shim to connect to it through.
+# it enables PROXY protocol in istio for an ingressgateway named "ingressgateway".
+# it then creates the shim on a static IP, assuming the use of metallb.
+# the values used here are not expected to work out of the box -- they are merely very
+# similar to my actual environment.
+
+---
+# This first example is setup to enable the example -- if you don't use istio, this first resource
+# is not useful for you
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: istio-enable-proxy-protocol
+  namespace: istio-system
+spec:
+  configPatches:
+  - applyTo: LISTENER_FILTER
+    patch:
+      operation: INSERT_FIRST
+      value:
+        name: proxy_protocol
+        typed_config:
+          '@type': type.googleapis.com/envoy.extensions.filters.listener.proxy_protocol.v3.ProxyProtocol
+  workloadSelector:
+    labels:
+      istio: ingressgateway
+
+---
+# This example is the actual shim pointed back at istio (but you can point it at anything!)
+apiVersion: utilities.strudelline.net/v1alpha1
+kind: ProxyProtocolShim
+metadata:
+  name: proxy-shim
+  namespace: istio-proxy-protocol-shim
+spec:
+  upstream:
+    http: istio-ingressgateway.istio-system.svc.cluster.local:80
+    https: istio-ingressgateway.istio-system.svc.cluster.local:443
+  commonAnnotations:
+    metallb.universe.tf/allow-shared-ip: 192.168.2.80
+    metallb.universe.tf/loadBalancerIPs: 192.168.2.80
