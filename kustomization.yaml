@@ -1,0 +1,13 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namePrefix: proxy-protocol-shim-
+
+commonLabels:
+  app: proxy-protocol-shim
+
+resources:
+  - svc.yaml
+  - deployment.yaml
+  - cm.yaml
+  - ns.yaml
