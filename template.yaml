@@ -32,6 +32,7 @@ spec:
             timeout connect 5000
             timeout client  50000
             timeout server  50000
+            http-reuse never
         
         frontend http80
             bind *:80
