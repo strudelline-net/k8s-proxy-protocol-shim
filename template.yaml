@@ -33,6 +33,7 @@ spec:
             timeout client  50000
             timeout server  50000
             http-reuse never
+            option disable-h2-upgrade
         
         frontend http80
             bind *:80
