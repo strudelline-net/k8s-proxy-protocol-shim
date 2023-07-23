@@ -18,35 +18,36 @@ spec:
       HTTP_UPSTREAM: "{{ .spec.upstream.http }}"
       haproxy.cfg: |
         global
-        	log stdout format raw local0
-        	stats timeout 30s
-        	user haproxy
-        	group haproxy
+            log stdout format raw local0
+            stats timeout 30s
+            user haproxy
+            group haproxy
         
         defaults
-        	log	global
-        	mode	tcp
-        	option	tcplog
-        	option	dontlognull
+            log        global
+            mode        http
+            option        httplog
+            option        dontlognull
             balance source
             timeout connect 5000
             timeout client  50000
             timeout server  50000
+            http-reuse never
+            option disable-h2-upgrade
         
         frontend http80
             bind *:80
-            mode http
             http-request redirect scheme https
         
         frontend https443
-            bind *:443
+            bind *:443 ssl crt /ssl-tmp/tls.pem
             default_backend httpsnodes
         
         backend httpnodes
-            server s1 $HTTP_UPSTREAM check send-proxy
+            server s1 $HTTP_UPSTREAM check
         
         backend httpsnodes
-            server s1 $HTTPS_UPSTREAM check send-proxy
+            server s1 $HTTPS_UPSTREAM check
         
         frontend stats
             mode http
@@ -74,39 +75,63 @@ spec:
           labels:
             app: "{{.metadata.name}}-haproxy-server"
         spec:
+          initContainers:
+          - name: combine-certs
+            command: ["bash", "-c"]
+            args:
+            - |
+                cat /ssl/tls.crt /ssl/tls.key > /ssl-tmp/tls.pem
+            image: debian:11
+            volumeMounts:
+            - mountPath: /ssl
+              name: ssl
+            - mountPath: /ssl-tmp
+              name: ssl-tmp
           containers:
-           -  image: haproxy:latest
-              name: haproxy
-              env:
-              - name: HTTP_UPSTREAM
-                valueFrom:
-                  configMapKeyRef:
-                    name: "{{.metadata.name}}-haproxy-server"
-                    key: HTTP_UPSTREAM
-              - name: HTTPS_UPSTREAM
-                valueFrom:
-                  configMapKeyRef:
-                    name: "{{.metadata.name}}-haproxy-server"
-                    key: HTTPS_UPSTREAM
-              volumeMounts:
-                - mountPath: /usr/local/etc/haproxy/haproxy.cfg
-                  name: config
-                  subPath: haproxy.cfg
-              ports:
-              - containerPort: 80
-                name: http
-                protocol: TCP
-              - containerPort: 443
-                name: https
-                protocol: TCP
-              - containerPort: 8404
-                name: stats
-                protocol: TCP
+          - image: haproxy:latest
+            name: haproxy
+            env:
+            - name: HTTP_UPSTREAM
+              valueFrom:
+                configMapKeyRef:
+                  name: "{{.metadata.name}}-haproxy-server"
+                  key: HTTP_UPSTREAM
+            - name: HTTPS_UPSTREAM
+              valueFrom:
+                configMapKeyRef:
+                  name: "{{.metadata.name}}-haproxy-server"
+                  key: HTTPS_UPSTREAM
+            volumeMounts:
+            - mountPath: /usr/local/etc/haproxy/haproxy.cfg
+              name: config
+              subPath: haproxy.cfg
+            - mountPath: /ssl
+              name: ssl
+            - mountPath: /ssl-tmp
+              name: ssl-tmp
+            ports:
+            - containerPort: 80
+              name: http
+              protocol: TCP
+            - containerPort: 443
+              name: https
+              protocol: TCP
+            - containerPort: 8404
+              name: stats
+              protocol: TCP
           restartPolicy: Always
           volumes:
             - name: config
               configMap:
                 name: "{{.metadata.name}}-haproxy-server"
+            - name: ssl
+              secret:
+                secretName: wildcard-tls
+                optional: false
+            - name: ssl-tmp
+              emptyDir:
+                medium: Memory
+                sizeLimit: 5Mi
   - apiVersion: v1
     kind: Service
     metadata:
